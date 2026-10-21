@@ -1,67 +1,59 @@
-# La Cielo Cafe — production starter
+# La Cielo Cafe — Admin Panel Starter
 
-This package is a secure-backend starter, not yet a finished production deployment. No external accounts are connected and no live orders or WhatsApp messages will be sent until you complete the setup and integrate the existing prototype's UI with Supabase.
+This is a responsive admin-panel starter for the existing La Cielo static website. It includes:
+- Supabase Auth admin login with admin allow-list check
+- Forgot-password email flow and reset-password page
+- Cafe contact/business settings form
+- Menu item create/edit/availability controls
+- Orders, bookings and reviews table/status management
+- Responsive layout for desktop and mobile
 
-## Files
-- `demo-prototype-not-production.html`: your earlier prototype, retained for design reference only. It uses localStorage and demo password `demo123`; do not deploy it as the production site or collect real customer information with it.
-- `config.example.js`: browser-safe Supabase project URL + publishable key template.
-- `admin-login.html`: Supabase password login and an `admin_users` authorization check.
-- `schema.sql`: database tables and Row Level Security policies for menu, orders, reviews, bookings and photo storage.
-- `supabase/functions/notify-whatsapp/index.ts`: WhatsApp Cloud API notification function starter. Requires server-side secrets and a trusted order workflow before use.
+## Important status
+This is a starter, not a fully tested production deployment. It does not automatically merge itself into the existing `index.html`, and it does not configure your Supabase project for you. Customer-facing order and booking forms must be integrated with the same schema before going live. Orders are deliberately constrained by the SQL policy to `total_paise = 0`; do not remove this guard or accept payments until a trusted server-side function validates menu item IDs, quantities, prices, delivery fees, and totals. Add rate limiting/CAPTCHA and test the database policies before public launch.
 
-## Step 1 — Create Supabase project
-1. Sign in to Supabase and create a new project for La Cielo Cafe.
-2. Save the database password in a password manager. Do not put it in GitHub.
-3. Open Project Settings → API (or API Keys). Copy Project URL and the publishable key.
-4. Copy `config.example.js` to `config.js` and fill in those two public values. `config.js` is safe only for the project URL and publishable key; never put a secret/service_role key in it.
+## 1. Put files in the GitHub repository root
+Copy these files into the root of your existing repository (alongside `index.html`):
+- `admin.html`
+- `admin-login.html` (replace the old starter version)
+- `reset-password.html`
+- `admin.css`
+- `config.example.js`
+- `supabase/schema.sql`
 
-## Step 2 — Create database
-1. Open SQL Editor in the Supabase dashboard.
-2. Review `schema.sql` and run it on the new, empty project.
-3. Confirm tables exist: `admin_users`, `menu_items`, `orders`, `reviews`, `bookings`.
-4. Confirm RLS is enabled on each table. Test with a non-admin session: it must not be able to select orders/bookings or modify menu items.
+Keep your current `index.html`. Do not overwrite it with the prototype unless you intentionally want that preview.
 
-## Step 3 — Create the first admin account
-1. In Supabase Authentication → Users, add the cafe owner's email as a user (set a strong unique password or send an invite, according to the options shown in your dashboard).
-2. Copy the user's UUID.
-3. In SQL Editor, run this after replacing the UUID:
+## 2. Configure Supabase
+1. Create/open the cafe project in https://supabase.com/dashboard.
+2. In SQL Editor, run `supabase/schema.sql` once on a new/empty project. Review first if the project already has tables or policies.
+3. In Authentication → Users, create the admin user with their real email.
+4. Copy the user's UUID from the user details.
+5. In SQL Editor, run this with the real UUID substituted:
 
 ```sql
 insert into public.admin_users (user_id)
-values ('PASTE-AUTH-USER-UUID-HERE');
+values ('PASTE-ADMIN-USER-UUID-HERE');
 ```
 
-4. Disable public sign-ups in Authentication settings if the project will only have admin users. Use password reset or a secure invitation flow for future admins.
-5. `admin-login.html` verifies both successful Supabase authentication and membership in `admin_users`. It is a login starter only; the dashboard operations still need to be connected to the database.
+6. Copy `config.example.js` to a new file named `config.js`. Put the Supabase Project URL and publishable/anon key in it. Never put a secret/service-role key in browser files.
+7. In Supabase Authentication URL Configuration, add your published website URL to Site URL / Redirect URLs, including the reset page URL. Example pattern: `https://YOUR-USERNAME.github.io/YOUR-REPOSITORY/reset-password.html`.
+8. Configure Supabase email delivery for reliable password reset emails. Test the reset link from the deployed site.
 
-## Step 4 — Test locally
-For local testing, serve the folder with a static server rather than opening the HTML with `file://`. For example, if Python is installed, run from this folder:
+## 3. GitHub Pages
+In repository Settings → Pages, choose Deploy from a branch, branch `main`, folder `/(root)`, then Save. Commit and push files to publish. The admin URL is `/admin-login.html`; do not add a link to it in the customer navigation. Hiding the link is not security—Supabase auth and RLS are the actual protections.
+
+## 4. Commit from Codespaces
+Run one command at a time:
 
 ```bash
-python -m http.server 8000
+git add admin.html admin-login.html reset-password.html admin.css config.example.js supabase/schema.sql README.md
+git commit -m "Add La Cielo admin dashboard and password reset"
+git push
 ```
 
-Open `http://localhost:8000/admin-login.html`. Do not commit `config.js` if you prefer not to expose project metadata, and do not ever commit server-side secrets. The publishable key is designed for browser use, but its safety depends on correct RLS policies.
-
-## Step 5 — Production website and GitHub Pages
-1. Create a private development repository or a public site repository containing only the production frontend and `config.js` with the publishable key.
-2. Enable GitHub Pages for the site branch/folder and test the deployed URL.
-3. Add the exact deployed domain to Supabase Authentication → URL Configuration / allowed redirect URLs.
-4. Before launch, remove the demo `demo123` login and localStorage order flows. Connect the public menu to `menu_items`, the order form to a validated order-creation flow, and the admin UI to authenticated Supabase queries.
-
-## Important implementation tasks before real customers use it
-- Order prices must be recalculated on the server/database from current menu prices. Never trust a customer-provided total or item price. The included schema stores a total but does not yet implement a trusted checkout function.
-- Add rate limiting / CAPTCHA / abuse prevention for anonymous order and review submissions.
-- Add an order-creation Edge Function that validates item IDs, quantities, current prices, availability, delivery details, and computes totals server-side before inserting an order. It should also trigger notifications reliably. Do not use the `notify-whatsapp` function as an unauthenticated public endpoint.
-- Restrict CORS and add server-side validation before launch.
-- Ensure phone numbers, delivery addresses and order history are visible only to authorized staff. Establish a retention policy for customer data.
-- Configure WhatsApp Cloud API credentials and recipient phone number in Supabase Edge Function secrets, then test with a permitted recipient. Meta setup may require a business portfolio, WhatsApp Business Account, and approved sender. Provider fees and messaging rules may apply.
-- Confirm the cafe owner has authorized use of their name, logo, photos and menu. Verify every item and price.
-- The schema is a starting point; review it and test policies in a staging project before applying to a live project.
-
-## Official references
-- Supabase data security: https://supabase.com/docs/guides/database/secure-data
-- Supabase Row Level Security: https://supabase.com/docs/guides/database/postgres/row-level-security
-- Supabase Auth: https://supabase.com/docs/guides/auth
-- Supabase Edge Functions: https://supabase.com/docs/guides/functions
-- Meta WhatsApp Cloud API: https://developers.facebook.com/docs/whatsapp/cloud-api/overview
+## 5. Features / notes
+- Dashboard uses `cafe_settings` singleton row id `1`; settings changes save to Supabase.
+- Menu manager uses `menu_items` table.
+- Orders/bookings/reviews pages show records and allow status updates when records exist.
+- The public website must be integrated with `cafe_settings`, `menu_items`, `orders`, `bookings`, and `reviews` to reflect these changes and collect records.
+- `config.js` is intentionally not included because it contains your project-specific public config. The publishable/anon key is intended for browser use with RLS enabled; secret/service-role keys are not.
+- This starter uses the Supabase JS CDN and Google Fonts; these require internet access in the browser.
